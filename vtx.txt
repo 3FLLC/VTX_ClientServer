@@ -548,3 +548,122 @@ Colors
 
     PETSCII colors are same as system referenced to by the CodePages
     VIC20, C64, or C128
+    
+Kitty Graphics
+==============
+Section by Ozz Nixon (author PCBoard 16).
+Source: https://sw.kovidgoyal.net/kitty/graphics-protocol.html
+
+All graphics escape codes are of the form:
+
+   <ESC>_G<control data>;<payload><ESC>\
+
+This is a so-called Application Programming Command (APC). Most terminal emulators ignore APC codes, making it safe to use.
+
+The control data is a comma-separated list of key=value pairs. The payload is arbitrary binary data, base64-encoded to prevent interoperation problems with legacy terminals that get confused by control codes within an APC code. The meaning of the payload is interpreted based on the control data.
+
+   <ESC>_Gf=24,s=10,v=20;<payload><ESC>\
+
+   o f=32 (which is the default) indicates 32-bit RGBA data
+   o f=24 indicates 24-bit RGB data
+   o f=100 indicates PNG data
+   
+   o The width and height are specified using the s and v keys respectively (See summary below)
+   
+   <ESC>_Gf=100;<payload><ESC>\
+   
+   o The width and height of the image will be read from the PNG data itself. Note that if you use both PNG and compression, then you must provide the S key with the size of the PNG data.
+   
+   <ESC>_Gf=24,s=10,v=20,o=z;<payload><ESC>\
+   
+   o send compressed image data to the terminal emulator, by specifying the o key. Currently, only zlib based deflate compression is supported, which is specified using o=z.
+   
+   o This is the same as the example from the RGB data section, except that the payload is now compressed using deflate. The terminal emulator will decompress it before rendering. You can specify compression for any <payload> format.
+   
+   o transmission medium is specified using the t key
+   
+   REMOTE CLIENT
+   -------------
+   
+   <ESC>_Gs=100,v=30,m=1;<encoded pixel data first chunk><ESC>\
+   <ESC>_Gm=1;<encoded pixel data second chunk><ESC>\
+   <ESC>_Gm=0;<encoded pixel data last chunk><ESC>\
+   
+   o sends the graphics escape code as usual, with the addition of an m key that must have the value 1 for all but the last chunk, where it must be 0.
+   
+   o can send an id with the control data, using the i key (which can be an arbitrary positive integer up to 4294967295, it must not be zero).
+   
+   Example: <ESC>_Gi=31;error message or OK<ESC>\
+   
+   REMOVING IMAGES FROM DISPLAY
+   ----------------------------
+   
+   <ESC>_Ga=d<ESC>\         # delete all visible images
+   <ESC>_Ga=d,i=10<ESC>\    # delete the image with id=10
+   <ESC>_Ga=Z,z=-1<ESC>\    # delete the images with z-index -1, also freeing up image data
+   <ESC>_Ga=P,x=3,y=4<ESC>\ # delete all images that intersect the cell at (3, 4)
+   
+   <ESC>[2J     # should also clear all images. This is so that the clear command works.
+   
+   SUMMARY
+   -------
+
+The table below shows all the control data keys as well as what values they can take, and the default value they take when missing. All integers are 32-bit.
+
+Key       | Value            | Default | Description
+----------|------------------|---------|----------------------------------------------
+a         | Single character | t       | The overall action this graphics command is
+          | t, T, q, p, d    |         | performing.
+--------------------------------------------------------------------------------------
+| Keys for image transmission                                                        |
+--------------------------------------------------------------------------------------
+f         | Positive integer | 32      | The format in which the image data is sent.
+          | 24, 32, 100      |         |
+----------|------------------|---------|----------------------------------------------
+t         | Single character | d       | The transmission medium used.
+          | d, f, t, s       |         |
+----------|------------------|---------|----------------------------------------------
+s         | Positive integer | 0       | The width of the image being sent.
+----------|------------------|---------|----------------------------------------------
+v         | Positive integer | 0       | The height of the image being sent.
+----------|------------------|---------|----------------------------------------------
+S         | Positive integer | 0       | The size of data to read from a file.
+----------|------------------|---------|----------------------------------------------
+O         | Positive integer | 0       | The offset from which to read data from a file.
+----------|------------------|---------|----------------------------------------------
+i         | Positive integer | 0       | The image ID
+          | 0 to 4294967295  |         |
+----------|------------------|---------|----------------------------------------------
+o         | Single character | null    | The type of data compression.
+          | only z           |         |
+----------|------------------|---------|----------------------------------------------
+m         | zero or one      | 0       | Whether there is more chunked data available.
+--------------------------------------------------------------------------------------
+| Keys for image display                                                             |
+--------------------------------------------------------------------------------------
+x         | Positive integer | 0       | The left edge (in pixels) of the image area to display
+----------|------------------|---------|----------------------------------------------
+y         | Positive integer | 0       | The top edge (in pixels) of the image area to display
+----------|------------------|---------|----------------------------------------------
+w         | Positive integer | 0       | The width (in pixels) of the image area to display.
+          |                  |         | By default, the entire width is used.
+----------|------------------|---------|----------------------------------------------
+h         | Positive integer | 0       | The height (in pixels) of the image area to display.
+          |                  |         | By default, the entire height is used.
+----------|------------------|---------|----------------------------------------------
+X         | Positive integer | 0       | The x-offset within the first cell at which to start displaying the image
+----------|------------------|---------|----------------------------------------------
+Y         | Positive integer | 0       | The y-offset within the first cell at which to start displaying the image
+----------|------------------|---------|----------------------------------------------
+c         |Positive integer  | 0       | The number of columns to display the image over
+----------|------------------|---------|----------------------------------------------
+r         | Positive integer | 0       | The number of rows to display the image over
+----------|------------------|---------|----------------------------------------------
+z         | Integer          | 0       | The z-index vertical stacking order of the image
+--------------------------------------------------------------------------------------
+| Keys for deleting images                                                           |
+--------------------------------------------------------------------------------------
+d         | Single character | a       | What to delete.
+          | a, A, c, C, i, I,|
+          | p, P, q, Q, x, X,|
+          | y, Y, z, Z)      |
